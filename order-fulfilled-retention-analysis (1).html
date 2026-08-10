@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order Fulfilled Flows — Retention Analysis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #0a0a0f; color: #e8e6f0; font-size: 15px; line-height: 1.6; }
+
+  .report { max-width: 1080px; margin: 0 auto; padding: 48px 32px 80px; }
+
+  .header { margin-bottom: 48px; border-bottom: 1px solid #1e1c2e; padding-bottom: 40px; }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #7c68e0; margin-bottom: 12px; }
+  h1 { font-size: 36px; font-weight: 600; color: #f0eeff; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 12px; }
+  .subtitle { color: #8a8599; font-size: 15px; }
+  .meta { display: flex; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
+  .meta-item { font-size: 13px; color: #8a8599; }
+  .meta-item strong { color: #c4beea; font-weight: 500; }
+
+  .section { margin-bottom: 56px; }
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #5a4fa0; margin-bottom: 6px; }
+  h2 { font-size: 21px; font-weight: 600; color: #f0eeff; letter-spacing: -0.01em; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #1a1828; }
+  h3 { font-size: 15px; font-weight: 500; color: #c4beea; margin-bottom: 10px; }
+  p { color: #a09ab8; margin-bottom: 12px; }
+  p strong { color: #d0cbf0; font-weight: 500; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 8px; }
+  .stat-card { background: #12101e; border: 0.5px solid #2a2540; border-radius: 10px; padding: 18px 16px; }
+  .stat-label-top { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5a4fa0; margin-bottom: 8px; }
+  .stat-n { font-size: 24px; font-weight: 600; color: #f0eeff; line-height: 1.15; margin-bottom: 4px; }
+  .stat-delta { font-size: 12px; font-weight: 500; }
+  .stat-delta.down { color: #e06767; }
+  .stat-delta.up { color: #4fbf8a; }
+  .stat-delta.flat { color: #8a8599; }
+
+  .chart-wrap { background: #0e0c1a; border: 0.5px solid #1e1c2e; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .chart-title { font-size: 13px; font-weight: 500; color: #c4beea; margin-bottom: 4px; }
+  .chart-sub { font-size: 12px; color: #6b647e; margin-bottom: 18px; }
+  .chart-inner { position: relative; width: 100%; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8a84a4; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-line { width: 14px; height: 2px; flex-shrink: 0; }
+
+  .insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+  .insight-card { background: #0e0c1a; border: 0.5px solid #2a2540; border-left: 3px solid #7c68e0; border-radius: 0 10px 10px 0; padding: 16px 18px; }
+  .insight-card.amber { border-left-color: #c48a1a; }
+  .insight-card.teal { border-left-color: #1a9e78; }
+  .insight-card.coral { border-left-color: #c45a30; }
+  .insight-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #7c68e0; margin-bottom: 6px; }
+  .insight-card.amber .insight-tag { color: #c48a1a; }
+  .insight-card.teal .insight-tag { color: #1a9e78; }
+  .insight-card.coral .insight-tag { color: #c45a30; }
+  .insight-text { font-size: 13px; color: #9a94b2; line-height: 1.5; }
+  .insight-text strong { color: #d0cbf0; font-weight: 500; }
+
+  .market-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .mkt-btn { font-size: 12px; font-weight: 500; background: #16142a; color: #a89fd0; border: 0.5px solid #2a2540; border-radius: 100px; padding: 7px 16px; cursor: pointer; transition: all 0.15s ease; }
+  .mkt-btn:hover { background: #1c1a34; border-color: #3a3260; }
+  .mkt-btn.active { background: #7c68e0; color: #ffffff; border-color: #7c68e0; }
+
+  .mkt-stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .mkt-stat { background: #12101e; border: 0.5px solid #2a2540; border-radius: 10px; padding: 14px 16px; }
+  .mkt-stat-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5a4fa0; margin-bottom: 6px; }
+  .mkt-stat-val { font-size: 19px; font-weight: 600; color: #f0eeff; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6b647e; padding: 10px 12px; border-bottom: 1px solid #2a2540; }
+  tbody td { padding: 11px 12px; border-bottom: 1px solid #16142a; color: #b0aac4; }
+  tbody tr:hover { background: #12101e; }
+  td.mkt-name { color: #d0cbf0; font-weight: 500; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .delta-tag { display: inline-block; padding: 2px 8px; border-radius: 100px; font-size: 12px; font-weight: 600; }
+  .delta-tag.bad { background: rgba(224,103,103,0.15); color: #e06767; }
+  .delta-tag.mid { background: rgba(196,138,26,0.15); color: #c48a1a; }
+  .delta-tag.ok { background: rgba(79,191,138,0.15); color: #4fbf8a; }
+
+  .divider { border: none; border-top: 1px solid #14121f; margin: 40px 0; }
+  .footer-note { font-size: 12px; color: #5a5470; line-height: 1.6; }
+
+  @media (max-width: 720px) {
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .mkt-stat-row { grid-template-columns: 1fr 1fr; }
+    .insight-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="report" id="report-root">
+
+  <div class="header">
+    <div class="eyebrow">Tasty Dose — Klaviyo Flow Performance</div>
+    <h1>Order Fulfilled Flows<br>Retention Analysis</h1>
+    <div class="subtitle">Coffee 2.0 · 1st &amp; 2nd Purchase Order Fulfilled flows, combined · 11 markets · Week-by-week, Monday–Sunday</div>
+    <div class="meta">
+      <div class="meta-item"><strong>Range:</strong> May 14 – Aug 9, 2026 (13 weeks)</div>
+      <div class="meta-item"><strong>Markets:</strong> DACH, HU, CZ, NL, IT, ESP, SK, SLO, PL, FRA, HR</div>
+      <div class="meta-item"><strong>Conversion metric:</strong> Placed Order (flow-attributed)</div>
+    </div>
+  </div>
+
+  <!-- KPI OVERVIEW -->
+  <div class="section">
+    <div class="section-label">Headline</div>
+    <h2>Retention is dropping — and it's not a volume problem</h2>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label-top">Total recipients</div>
+        <div class="stat-n">1.99M</div>
+        <div class="stat-delta flat">Across 13 weeks, all OF flows</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label-top">Total revenue</div>
+        <div class="stat-n">€382.8k</div>
+        <div class="stat-delta flat">Flow-attributed Placed Orders</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label-top">Open rate: May 25–31 → Aug 3–9</div>
+        <div class="stat-n">44.1% → 28.5%</div>
+        <div class="stat-delta down">▼ 15.6 pts (‑35% relative)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label-top">Revenue: peak week → now</div>
+        <div class="stat-n">€49.2k → €33.0k</div>
+        <div class="stat-delta down">▼ 33% while send volume held flat (‑0.1%)</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- CHART 1: VOLUME & OPEN RATE -->
+  <div class="section">
+    <div class="section-label">Trend · Week 1 of 13 → Week 13 of 13</div>
+    <h2>Send volume vs. open rate</h2>
+    <p>Weekly recipients across all Order Fulfilled flows (bars) against the blended open rate (line). Volume has grown 150x since launch as more markets and 2nd-purchase flows came online — <strong>open rate has fallen the entire time, independent of that growth.</strong></p>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Weekly recipients (all markets, OF1 + OF2 combined) vs. open rate</div>
+      <div class="chart-sub">Bars = recipients (left axis) · Line = open rate % (right axis)</div>
+      <div class="chart-inner" style="height: 340px;">
+        <canvas id="chartVolume" role="img" aria-label="Bar and line chart of weekly recipients versus open rate for Order Fulfilled flows"></canvas>
+      </div>
+    </div>
+
+    <div class="insight-grid">
+      <div class="insight-card">
+        <div class="insight-tag">Steady erosion</div>
+        <div class="insight-text">Open rate has declined in <strong>10 of the last 11 weeks</strong> — this isn't a one-off dip, it's a consistent downward trend since late May.</div>
+      </div>
+      <div class="insight-card coral">
+        <div class="insight-tag">Not a volume story</div>
+        <div class="insight-text">Recipients per week have been roughly flat since early July (~245–265k), so the falling open rate <strong>can't be explained by scale</strong> — something in list health, content, or deliverability is degrading.</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- CHART 2: REVENUE & CLICK RATE -->
+  <div class="section">
+    <h2>Revenue vs. click rate</h2>
+    <p>Revenue tracked volume growth through early July, then <strong>broke from that pattern</strong> — recipients kept climbing but revenue and click rate both turned down.</p>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Weekly flow-attributed revenue vs. click rate</div>
+      <div class="chart-sub">Bars = revenue € (left axis) · Line = click rate % (right axis)</div>
+      <div class="chart-inner" style="height: 340px;">
+        <canvas id="chartRevenue" role="img" aria-label="Bar and line chart of weekly revenue versus click rate for Order Fulfilled flows"></canvas>
+      </div>
+    </div>
+
+    <div class="insight-grid">
+      <div class="insight-card amber">
+        <div class="insight-tag">The turn</div>
+        <div class="insight-text">Revenue peaked <strong>Jul 6–12 at €49.2k</strong>. In the 4 weeks since, it's dropped <strong>33% to €33.0k</strong> — even though weekly recipients are essentially unchanged.</div>
+      </div>
+      <div class="insight-card teal">
+        <div class="insight-tag">Click rate roughly halved</div>
+        <div class="insight-text">Click rate fell from <strong>1.8% (May 25–31) to 1.3% (Aug 3–9)</strong>. Fewer opens plus a lower click-through on those opens compounds directly into fewer conversions.</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- MARKET EXPLORER -->
+  <div class="section">
+    <div class="section-label">Interactive</div>
+    <h2>Explore by market</h2>
+    <p>Select a market to see its weekly open rate and click rate trend. The erosion is broad-based but not uniform — some markets are stable or improving.</p>
+
+    <div class="market-buttons" id="marketButtons"></div>
+
+    <div class="mkt-stat-row" id="marketStats"></div>
+
+    <div class="chart-wrap">
+      <div class="chart-title" id="marketChartTitle">Weekly open rate &amp; click rate</div>
+      <div class="chart-sub">Line = open rate % (left axis) · Line = click rate % (right axis)</div>
+      <div class="chart-inner" style="height: 300px;">
+        <canvas id="chartMarket" role="img" aria-label="Line chart of open rate and click rate for the selected market"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- MARKET SUMMARY TABLE -->
+  <div class="section">
+    <div class="section-label">Ranked</div>
+    <h2>Open-rate erosion by market</h2>
+    <p>Comparing each market's average open rate in its first 4 active weeks vs. its most recent 4 weeks. Sorted worst → best.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Market</th>
+          <th class="num">Total recipients</th>
+          <th class="num">Total revenue</th>
+          <th class="num">Early open rate</th>
+          <th class="num">Recent open rate</th>
+          <th class="num">Δ (pts)</th>
+        </tr>
+      </thead>
+      <tbody id="marketTableBody"></tbody>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section">
+    <div class="section-label">Notes</div>
+    <p class="footer-note">
+      Data pulled from Klaviyo's Reporting API (send-date based, matches the Klaviyo UI), combining each market's Order Fulfilled &middot; Coffee &middot; 1st Purchase and 2nd Purchase flows. Weeks run Monday–Sunday, Europe/Ljubljana time; the first week (May 14–17) is a partial 4-day week since the range starts mid-week. HU and FRA 2nd Purchase, and HR (launched Jul 21), have fewer active weeks — their early-vs-recent comparison uses whatever weeks had send volume. "Cash generated" is flow-attributed Placed Order revenue.
+    </p>
+  </div>
+
+</div>
+
+<script>
+const WEEKLY = [{"label":"May 14-17 (partial)","start":"2026-05-14","end":"2026-05-17","markets":{"CZ":{"recipients":219,"delivered":216,"opens_unique":75,"clicks_unique":2,"conversion_value":68.95,"open_rate":0.3472,"click_rate":0.0093},"DACH":{"recipients":520,"delivered":520,"opens_unique":190,"clicks_unique":11,"conversion_value":75.3,"open_rate":0.3654,"click_rate":0.0212},"ESP":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"FRA":{"recipients":9,"delivered":9,"opens_unique":3,"clicks_unique":0,"conversion_value":0.0,"open_rate":0.3333,"click_rate":0.0},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":648,"delivered":643,"opens_unique":357,"clicks_unique":14,"conversion_value":132.3,"open_rate":0.5552,"click_rate":0.0218},"IT":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"NL":{"recipients":171,"delivered":169,"opens_unique":65,"clicks_unique":2,"conversion_value":0.0,"open_rate":0.3846,"click_rate":0.0118},"PL":{"recipients":1,"delivered":1,"opens_unique":1,"clicks_unique":1,"conversion_value":0.0,"open_rate":1.0,"click_rate":1.0},"SK":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"SLO":{"recipients":20,"delivered":20,"opens_unique":13,"clicks_unique":1,"conversion_value":0.0,"open_rate":0.65,"click_rate":0.05}},"total":{"recipients":1588,"delivered":1578,"opens_unique":704,"clicks_unique":31,"conversion_value":276.55,"open_rate":0.4461,"click_rate":0.0196}},{"label":"May 18-24","start":"2026-05-18","end":"2026-05-24","markets":{"CZ":{"recipients":507,"delivered":498,"opens_unique":160,"clicks_unique":10,"conversion_value":184.26,"open_rate":0.3213,"click_rate":0.0201},"DACH":{"recipients":715,"delivered":714,"opens_unique":246,"clicks_unique":15,"conversion_value":209.4,"open_rate":0.3445,"click_rate":0.021},"ESP":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"FRA":{"recipients":7,"delivered":7,"opens_unique":0,"clicks_unique":0,"conversion_value":0.0,"open_rate":0.0,"click_rate":0.0},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":932,"delivered":921,"opens_unique":494,"clicks_unique":25,"conversion_value":135.91,"open_rate":0.5364,"click_rate":0.0271},"IT":{"recipients":21,"delivered":21,"opens_unique":3,"clicks_unique":0,"conversion_value":0.0,"open_rate":0.1429,"click_rate":0.0},"NL":{"recipients":251,"delivered":246,"opens_unique":133,"clicks_unique":4,"conversion_value":0.0,"open_rate":0.5407,"click_rate":0.0163},"PL":{"recipients":30,"delivered":30,"opens_unique":21,"clicks_unique":0,"conversion_value":0.0,"open_rate":0.7,"click_rate":0.0},"SK":{"recipients":14,"delivered":14,"opens_unique":1,"clicks_unique":0,"conversion_value":0.0,"open_rate":0.0714,"click_rate":0.0},"SLO":{"recipients":28,"delivered":28,"opens_unique":9,"clicks_unique":0,"conversion_value":0.0,"open_rate":0.3214,"click_rate":0.0}},"total":{"recipients":2505,"delivered":2479,"opens_unique":1067,"clicks_unique":54,"conversion_value":529.57,"open_rate":0.4304,"click_rate":0.0218}},{"label":"May 25-31","start":"2026-05-25","end":"2026-05-31","markets":{"CZ":{"recipients":7720,"delivered":7680,"opens_unique":2284,"clicks_unique":121,"conversion_value":500.14,"open_rate":0.2974,"click_rate":0.0158},"DACH":{"recipients":10100,"delivered":10100,"opens_unique":3600,"clicks_unique":144,"conversion_value":1435.31,"open_rate":0.3564,"click_rate":0.0143},"ESP":{"recipients":139,"delivered":139,"opens_unique":77,"clicks_unique":2,"conversion_value":0.0,"open_rate":0.554,"click_rate":0.0144},"FRA":{"recipients":69,"delivered":69,"opens_unique":46,"clicks_unique":1,"conversion_value":0.0,"open_rate":0.6667,"click_rate":0.0145},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":10585,"delivered":10423,"opens_unique":6136,"clicks_unique":248,"conversion_value":602.12,"open_rate":0.5887,"click_rate":0.0238},"IT":{"recipients":240,"delivered":234,"opens_unique":130,"clicks_unique":7,"conversion_value":0.0,"open_rate":0.5556,"click_rate":0.0299},"NL":{"recipients":3763,"delivered":3693,"opens_unique":1931,"clicks_unique":56,"conversion_value":242.3,"open_rate":0.5229,"click_rate":0.0152},"PL":{"recipients":156,"delivered":155,"opens_unique":65,"clicks_unique":4,"conversion_value":0.0,"open_rate":0.4194,"click_rate":0.0258},"SK":{"recipients":160,"delivered":158,"opens_unique":65,"clicks_unique":3,"conversion_value":0.0,"open_rate":0.4114,"click_rate":0.019},"SLO":{"recipients":376,"delivered":372,"opens_unique":222,"clicks_unique":7,"conversion_value":0.0,"open_rate":0.5968,"click_rate":0.0188}},"total":{"recipients":33308,"delivered":33023,"opens_unique":14556,"clicks_unique":593,"conversion_value":2779.87,"open_rate":0.4408,"click_rate":0.018}},{"label":"Jun 1-7","start":"2026-06-01","end":"2026-06-07","markets":{"CZ":{"recipients":16785,"delivered":16784,"opens_unique":5674,"clicks_unique":354,"conversion_value":2638.93,"open_rate":0.3381,"click_rate":0.0211},"DACH":{"recipients":17625,"delivered":17564,"opens_unique":5960,"clicks_unique":313,"conversion_value":4374.64,"open_rate":0.3393,"click_rate":0.0178},"ESP":{"recipients":618,"delivered":618,"opens_unique":257,"clicks_unique":7,"conversion_value":119.6,"open_rate":0.4159,"click_rate":0.0113},"FRA":{"recipients":141,"delivered":141,"opens_unique":66,"clicks_unique":4,"conversion_value":0.0,"open_rate":0.4681,"click_rate":0.0284},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":20186,"delivered":20179,"opens_unique":10827,"clicks_unique":473,"conversion_value":4737.69,"open_rate":0.5365,"click_rate":0.0234},"IT":{"recipients":878,"delivered":878,"opens_unique":419,"clicks_unique":22,"conversion_value":0.0,"open_rate":0.4772,"click_rate":0.0251},"NL":{"recipients":7090,"delivered":7072,"opens_unique":3426,"clicks_unique":148,"conversion_value":1551.9,"open_rate":0.4844,"click_rate":0.0209},"PL":{"recipients":278,"delivered":278,"opens_unique":102,"clicks_unique":1,"conversion_value":53.08,"open_rate":0.3669,"click_rate":0.0036},"SK":{"recipients":498,"delivered":498,"opens_unique":238,"clicks_unique":11,"conversion_value":169.04,"open_rate":0.4779,"click_rate":0.0221},"SLO":{"recipients":819,"delivered":819,"opens_unique":408,"clicks_unique":36,"conversion_value":336.74,"open_rate":0.4982,"click_rate":0.044}},"total":{"recipients":64918,"delivered":64831,"opens_unique":27377,"clicks_unique":1369,"conversion_value":13981.62,"open_rate":0.4223,"click_rate":0.0211}},{"label":"Jun 8-14","start":"2026-06-08","end":"2026-06-14","markets":{"CZ":{"recipients":25039,"delivered":25031,"opens_unique":7914,"clicks_unique":486,"conversion_value":4971.11,"open_rate":0.3162,"click_rate":0.0194},"DACH":{"recipients":33457,"delivered":33339,"opens_unique":11047,"clicks_unique":544,"conversion_value":7384.88,"open_rate":0.3314,"click_rate":0.0163},"ESP":{"recipients":1128,"delivered":1126,"opens_unique":473,"clicks_unique":18,"conversion_value":185.1,"open_rate":0.4201,"click_rate":0.016},"FRA":{"recipients":220,"delivered":220,"opens_unique":94,"clicks_unique":4,"conversion_value":0.0,"open_rate":0.4273,"click_rate":0.0182},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":35107,"delivered":35088,"opens_unique":17353,"clicks_unique":655,"conversion_value":8010.41,"open_rate":0.4946,"click_rate":0.0187},"IT":{"recipients":1482,"delivered":1481,"opens_unique":657,"clicks_unique":32,"conversion_value":452.2,"open_rate":0.4436,"click_rate":0.0216},"NL":{"recipients":11143,"delivered":11105,"opens_unique":4639,"clicks_unique":173,"conversion_value":1128.61,"open_rate":0.4177,"click_rate":0.0156},"PL":{"recipients":434,"delivered":434,"opens_unique":138,"clicks_unique":1,"conversion_value":0.0,"open_rate":0.318,"click_rate":0.0023},"SK":{"recipients":1380,"delivered":1375,"opens_unique":637,"clicks_unique":24,"conversion_value":220.1,"open_rate":0.4633,"click_rate":0.0175},"SLO":{"recipients":1316,"delivered":1316,"opens_unique":571,"clicks_unique":24,"conversion_value":0.0,"open_rate":0.4339,"click_rate":0.0182}},"total":{"recipients":110706,"delivered":110515,"opens_unique":43523,"clicks_unique":1961,"conversion_value":22352.41,"open_rate":0.3938,"click_rate":0.0177}},{"label":"Jun 15-21","start":"2026-06-15","end":"2026-06-21","markets":{"CZ":{"recipients":33934,"delivered":33928,"opens_unique":9248,"clicks_unique":668,"conversion_value":4703.8,"open_rate":0.2726,"click_rate":0.0197},"DACH":{"recipients":47050,"delivered":46865,"opens_unique":14187,"clicks_unique":821,"conversion_value":16066.18,"open_rate":0.3027,"click_rate":0.0175},"ESP":{"recipients":1920,"delivered":1917,"opens_unique":918,"clicks_unique":29,"conversion_value":248.1,"open_rate":0.4789,"click_rate":0.0151},"FRA":{"recipients":220,"delivered":220,"opens_unique":97,"clicks_unique":2,"conversion_value":0.0,"open_rate":0.4409,"click_rate":0.0091},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":49490,"delivered":49441,"opens_unique":21610,"clicks_unique":1177,"conversion_value":13414.78,"open_rate":0.4371,"click_rate":0.0238},"IT":{"recipients":2040,"delivered":2037,"opens_unique":903,"clicks_unique":40,"conversion_value":947.6,"open_rate":0.4433,"click_rate":0.0196},"NL":{"recipients":13108,"delivered":13066,"opens_unique":5032,"clicks_unique":210,"conversion_value":4012.45,"open_rate":0.3851,"click_rate":0.0161},"PL":{"recipients":533,"delivered":533,"opens_unique":140,"clicks_unique":4,"conversion_value":0.0,"open_rate":0.2627,"click_rate":0.0075},"SK":{"recipients":1882,"delivered":1878,"opens_unique":722,"clicks_unique":29,"conversion_value":228.1,"open_rate":0.3845,"click_rate":0.0154},"SLO":{"recipients":1510,"delivered":1506,"opens_unique":547,"clicks_unique":31,"conversion_value":246.4,"open_rate":0.3632,"click_rate":0.0206}},"total":{"recipients":151687,"delivered":151391,"opens_unique":53404,"clicks_unique":3011,"conversion_value":39867.41,"open_rate":0.3528,"click_rate":0.0199}},{"label":"Jun 22-28","start":"2026-06-22","end":"2026-06-28","markets":{"CZ":{"recipients":36014,"delivered":36004,"opens_unique":8527,"clicks_unique":499,"conversion_value":3608.99,"open_rate":0.2368,"click_rate":0.0139},"DACH":{"recipients":65552,"delivered":65319,"opens_unique":19376,"clicks_unique":1220,"conversion_value":27143.75,"open_rate":0.2966,"click_rate":0.0187},"ESP":{"recipients":3072,"delivered":3070,"opens_unique":1316,"clicks_unique":49,"conversion_value":300.0,"open_rate":0.4287,"click_rate":0.016},"FRA":{"recipients":338,"delivered":338,"opens_unique":126,"clicks_unique":5,"conversion_value":233.1,"open_rate":0.3728,"click_rate":0.0148},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":51083,"delivered":51053,"opens_unique":19615,"clicks_unique":997,"conversion_value":10239.89,"open_rate":0.3842,"click_rate":0.0195},"IT":{"recipients":3107,"delivered":3107,"opens_unique":1306,"clicks_unique":67,"conversion_value":421.7,"open_rate":0.4203,"click_rate":0.0216},"NL":{"recipients":13824,"delivered":13767,"opens_unique":5027,"clicks_unique":207,"conversion_value":3549.87,"open_rate":0.3651,"click_rate":0.015},"PL":{"recipients":565,"delivered":565,"opens_unique":151,"clicks_unique":4,"conversion_value":193.27,"open_rate":0.2673,"click_rate":0.0071},"SK":{"recipients":2893,"delivered":2890,"opens_unique":1046,"clicks_unique":37,"conversion_value":1094.34,"open_rate":0.3619,"click_rate":0.0128},"SLO":{"recipients":2056,"delivered":2051,"opens_unique":719,"clicks_unique":57,"conversion_value":500.24,"open_rate":0.3506,"click_rate":0.0278}},"total":{"recipients":178504,"delivered":178164,"opens_unique":57209,"clicks_unique":3142,"conversion_value":47285.15,"open_rate":0.3211,"click_rate":0.0176}},{"label":"Jun 29-Jul 5","start":"2026-06-29","end":"2026-07-05","markets":{"CZ":{"recipients":39792,"delivered":39766,"opens_unique":10753,"clicks_unique":731,"conversion_value":5972.71,"open_rate":0.2704,"click_rate":0.0184},"DACH":{"recipients":71918,"delivered":71544,"opens_unique":19790,"clicks_unique":1208,"conversion_value":18760.99,"open_rate":0.2766,"click_rate":0.0169},"ESP":{"recipients":3652,"delivered":3641,"opens_unique":1451,"clicks_unique":52,"conversion_value":119.6,"open_rate":0.3985,"click_rate":0.0143},"FRA":{"recipients":381,"delivered":379,"opens_unique":135,"clicks_unique":4,"conversion_value":0.0,"open_rate":0.3562,"click_rate":0.0106},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":50889,"delivered":50861,"opens_unique":18440,"clicks_unique":971,"conversion_value":13319.47,"open_rate":0.3626,"click_rate":0.0191},"IT":{"recipients":3195,"delivered":3176,"opens_unique":1269,"clicks_unique":63,"conversion_value":487.1,"open_rate":0.3996,"click_rate":0.0198},"NL":{"recipients":16596,"delivered":16481,"opens_unique":6301,"clicks_unique":236,"conversion_value":3379.97,"open_rate":0.3823,"click_rate":0.0143},"PL":{"recipients":506,"delivered":506,"opens_unique":135,"clicks_unique":6,"conversion_value":287.65,"open_rate":0.2668,"click_rate":0.0119},"SK":{"recipients":3873,"delivered":3862,"opens_unique":1434,"clicks_unique":66,"conversion_value":702.6,"open_rate":0.3713,"click_rate":0.0171},"SLO":{"recipients":2154,"delivered":2148,"opens_unique":763,"clicks_unique":57,"conversion_value":463.98,"open_rate":0.3552,"click_rate":0.0265}},"total":{"recipients":192956,"delivered":192364,"opens_unique":60471,"clicks_unique":3394,"conversion_value":43494.07,"open_rate":0.3144,"click_rate":0.0176}},{"label":"Jul 6-12","start":"2026-07-06","end":"2026-07-12","markets":{"CZ":{"recipients":56331,"delivered":56303,"opens_unique":17450,"clicks_unique":1108,"conversion_value":9863.01,"open_rate":0.3099,"click_rate":0.0197},"DACH":{"recipients":81641,"delivered":81373,"opens_unique":22759,"clicks_unique":1092,"conversion_value":16218.63,"open_rate":0.2797,"click_rate":0.0134},"ESP":{"recipients":7351,"delivered":7340,"opens_unique":2980,"clicks_unique":108,"conversion_value":597.46,"open_rate":0.406,"click_rate":0.0147},"FRA":{"recipients":411,"delivered":411,"opens_unique":181,"clicks_unique":8,"conversion_value":168.0,"open_rate":0.4404,"click_rate":0.0195},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":62227,"delivered":62168,"opens_unique":24029,"clicks_unique":1089,"conversion_value":13566.93,"open_rate":0.3865,"click_rate":0.0175},"IT":{"recipients":7811,"delivered":7807,"opens_unique":3032,"clicks_unique":119,"conversion_value":1153.9,"open_rate":0.3884,"click_rate":0.0152},"NL":{"recipients":24262,"delivered":24118,"opens_unique":9688,"clicks_unique":379,"conversion_value":5493.43,"open_rate":0.4017,"click_rate":0.0157},"PL":{"recipients":604,"delivered":597,"opens_unique":177,"clicks_unique":4,"conversion_value":102.8,"open_rate":0.2965,"click_rate":0.0067},"SK":{"recipients":6165,"delivered":6152,"opens_unique":2358,"clicks_unique":109,"conversion_value":1179.96,"open_rate":0.3833,"click_rate":0.0177},"SLO":{"recipients":2210,"delivered":2204,"opens_unique":809,"clicks_unique":69,"conversion_value":867.0,"open_rate":0.3671,"click_rate":0.0313}},"total":{"recipients":249013,"delivered":248473,"opens_unique":83463,"clicks_unique":4085,"conversion_value":49211.12,"open_rate":0.3359,"click_rate":0.0164}},{"label":"Jul 13-19","start":"2026-07-13","end":"2026-07-19","markets":{"CZ":{"recipients":48263,"delivered":48224,"opens_unique":12804,"clicks_unique":867,"conversion_value":8206.93,"open_rate":0.2655,"click_rate":0.018},"DACH":{"recipients":81997,"delivered":81741,"opens_unique":21896,"clicks_unique":1217,"conversion_value":16399.16,"open_rate":0.2679,"click_rate":0.0149},"ESP":{"recipients":8646,"delivered":8625,"opens_unique":3392,"clicks_unique":118,"conversion_value":993.51,"open_rate":0.3933,"click_rate":0.0137},"FRA":{"recipients":383,"delivered":381,"opens_unique":157,"clicks_unique":3,"conversion_value":0.0,"open_rate":0.4121,"click_rate":0.0079},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":59233,"delivered":59161,"opens_unique":21182,"clicks_unique":1045,"conversion_value":10464.63,"open_rate":0.358,"click_rate":0.0177},"IT":{"recipients":15125,"delivered":15098,"opens_unique":5692,"clicks_unique":214,"conversion_value":1174.17,"open_rate":0.377,"click_rate":0.0142},"NL":{"recipients":20420,"delivered":20336,"opens_unique":7568,"clicks_unique":341,"conversion_value":3380.24,"open_rate":0.3721,"click_rate":0.0168},"PL":{"recipients":621,"delivered":618,"opens_unique":176,"clicks_unique":9,"conversion_value":167.4,"open_rate":0.2848,"click_rate":0.0146},"SK":{"recipients":6009,"delivered":5994,"opens_unique":2106,"clicks_unique":113,"conversion_value":1305.62,"open_rate":0.3514,"click_rate":0.0189},"SLO":{"recipients":1815,"delivered":1811,"opens_unique":635,"clicks_unique":44,"conversion_value":192.85,"open_rate":0.3506,"click_rate":0.0243}},"total":{"recipients":242512,"delivered":241989,"opens_unique":75608,"clicks_unique":3971,"conversion_value":42284.51,"open_rate":0.3124,"click_rate":0.0164}},{"label":"Jul 20-26","start":"2026-07-20","end":"2026-07-26","markets":{"CZ":{"recipients":53216,"delivered":53168,"opens_unique":14229,"clicks_unique":889,"conversion_value":9944.91,"open_rate":0.2676,"click_rate":0.0167},"DACH":{"recipients":82389,"delivered":82107,"opens_unique":21085,"clicks_unique":1118,"conversion_value":15370.61,"open_rate":0.2568,"click_rate":0.0136},"ESP":{"recipients":10400,"delivered":10372,"opens_unique":4051,"clicks_unique":166,"conversion_value":515.4,"open_rate":0.3906,"click_rate":0.016},"FRA":{"recipients":330,"delivered":329,"opens_unique":116,"clicks_unique":1,"conversion_value":215.46,"open_rate":0.3526,"click_rate":0.003},"HR":{"recipients":0,"delivered":0,"opens_unique":0,"clicks_unique":0,"conversion_value":0,"open_rate":0,"click_rate":0},"HU":{"recipients":59058,"delivered":58998,"opens_unique":21982,"clicks_unique":1017,"conversion_value":9122.11,"open_rate":0.3726,"click_rate":0.0172},"IT":{"recipients":24015,"delivered":23980,"opens_unique":8925,"clicks_unique":357,"conversion_value":1800.37,"open_rate":0.3722,"click_rate":0.0149},"NL":{"recipients":21524,"delivered":21456,"opens_unique":7973,"clicks_unique":390,"conversion_value":5511.04,"open_rate":0.3716,"click_rate":0.0182},"PL":{"recipients":550,"delivered":549,"opens_unique":148,"clicks_unique":6,"conversion_value":126.85,"open_rate":0.2696,"click_rate":0.0109},"SK":{"recipients":9763,"delivered":9753,"opens_unique":3620,"clicks_unique":175,"conversion_value":1024.78,"open_rate":0.3712,"click_rate":0.0179},"SLO":{"recipients":1650,"delivered":1645,"opens_unique":578,"clicks_unique":53,"conversion_value":119.36,"open_rate":0.3514,"click_rate":0.0322}},"total":{"recipients":262895,"delivered":262357,"opens_unique":82707,"clicks_unique":4172,"conversion_value":43750.89,"open_rate":0.3152,"click_rate":0.0159}},{"label":"Jul 27-Aug 2","start":"2026-07-27","end":"2026-08-02","markets":{"CZ":{"recipients":47459,"delivered":47412,"opens_unique":12103,"clicks_unique":747,"conversion_value":8054.89,"open_rate":0.2553,"click_rate":0.0158},"DACH":{"recipients":77369,"delivered":77137,"opens_unique":19155,"clicks_unique":955,"conversion_value":18102.87,"open_rate":0.2483,"click_rate":0.0124},"ESP":{"recipients":12002,"delivered":11946,"opens_unique":4430,"clicks_unique":161,"conversion_value":586.7,"open_rate":0.3708,"click_rate":0.0135},"FRA":{"recipients":334,"delivered":334,"opens_unique":114,"clicks_unique":3,"conversion_value":144.6,"open_rate":0.3413,"click_rate":0.009},"HR":{"recipients":491,"delivered":484,"opens_unique":193,"clicks_unique":6,"conversion_value":0.0,"open_rate":0.3988,"click_rate":0.0124},"HU":{"recipients":57397,"delivered":57366,"opens_unique":20338,"clicks_unique":901,"conversion_value":8390.01,"open_rate":0.3545,"click_rate":0.0157},"IT":{"recipients":28451,"delivered":28403,"opens_unique":10276,"clicks_unique":404,"conversion_value":2874.08,"open_rate":0.3618,"click_rate":0.0142},"NL":{"recipients":13919,"delivered":13889,"opens_unique":4712,"clicks_unique":183,"conversion_value":3528.34,"open_rate":0.3393,"click_rate":0.0132},"PL":{"recipients":551,"delivered":546,"opens_unique":166,"clicks_unique":8,"conversion_value":102.88,"open_rate":0.304,"click_rate":0.0147},"SK":{"recipients":12074,"delivered":12059,"opens_unique":4304,"clicks_unique":196,"conversion_value":2020.2,"open_rate":0.3569,"click_rate":0.0163},"SLO":{"recipients":1468,"delivered":1468,"opens_unique":511,"clicks_unique":41,"conversion_value":227.03,"open_rate":0.3481,"click_rate":0.0279}},"total":{"recipients":251515,"delivered":251044,"opens_unique":76302,"clicks_unique":3605,"conversion_value":44031.6,"open_rate":0.3039,"click_rate":0.0144}},{"label":"Aug 3-9","start":"2026-08-03","end":"2026-08-09","markets":{"CZ":{"recipients":41586,"delivered":41562,"opens_unique":9340,"clicks_unique":526,"conversion_value":5293.52,"open_rate":0.2247,"click_rate":0.0127},"DACH":{"recipients":79093,"delivered":78778,"opens_unique":18865,"clicks_unique":900,"conversion_value":12931.48,"open_rate":0.2395,"click_rate":0.0114},"ESP":{"recipients":14878,"delivered":14860,"opens_unique":5265,"clicks_unique":175,"conversion_value":890.94,"open_rate":0.3543,"click_rate":0.0118},"FRA":{"recipients":333,"delivered":333,"opens_unique":130,"clicks_unique":5,"conversion_value":111.6,"open_rate":0.3904,"click_rate":0.015},"HR":{"recipients":3694,"delivered":3673,"opens_unique":1356,"clicks_unique":47,"conversion_value":786.53,"open_rate":0.3692,"click_rate":0.0128},"HU":{"recipients":58012,"delivered":57967,"opens_unique":19470,"clicks_unique":878,"conversion_value":8990.16,"open_rate":0.3359,"click_rate":0.0151},"IT":{"recipients":35177,"delivered":35134,"opens_unique":11184,"clicks_unique":426,"conversion_value":2100.68,"open_rate":0.3183,"click_rate":0.0121},"NL":{"recipients":1626,"delivered":1625,"opens_unique":549,"clicks_unique":34,"conversion_value":643.26,"open_rate":0.3378,"click_rate":0.0209},"PL":{"recipients":534,"delivered":529,"opens_unique":118,"clicks_unique":7,"conversion_value":0.0,"open_rate":0.2231,"click_rate":0.0132},"SK":{"recipients":12462,"delivered":12454,"opens_unique":3898,"clicks_unique":180,"conversion_value":1084.46,"open_rate":0.313,"click_rate":0.0145},"SLO":{"recipients":1361,"delivered":1360,"opens_unique":460,"clicks_unique":41,"conversion_value":134.89,"open_rate":0.3382,"click_rate":0.0301}},"total":{"recipients":248756,"delivered":248275,"opens_unique":70635,"clicks_unique":3219,"conversion_value":32967.52,"open_rate":0.2845,"click_rate":0.013}}];
+const SUMMARY = [{"market":"PL","total_recipients":5363,"total_revenue":1033.93,"weighted_open_rate":0.288,"weighted_click_rate":0.0103,"first4_open":0.6216,"last4_open":0.2704,"delta_pts":-35.1,"weeks_active":13},{"market":"HU","total_recipients":514847,"total_revenue":101126.41,"weighted_open_rate":0.3925,"weighted_click_rate":0.0185,"first4_open":0.5542,"last4_open":0.3552,"delta_pts":-19.9,"weeks_active":13},{"market":"SLO","total_recipients":16783,"total_revenue":3088.49,"weighted_open_rate":0.3729,"weighted_click_rate":0.0275,"first4_open":0.5166,"last4_open":0.3471,"delta_pts":-17.0,"weeks_active":13},{"market":"NL","total_recipients":147697,"total_revenue":32421.41,"weighted_open_rate":0.388,"weighted_click_rate":0.0161,"first4_open":0.4831,"last4_open":0.3552,"delta_pts":-12.8,"weeks_active":13},{"market":"DACH","total_recipients":649426,"total_revenue":154473.2,"weighted_open_rate":0.2753,"weighted_click_rate":0.0148,"first4_open":0.3514,"last4_open":0.2531,"delta_pts":-9.8,"weeks_active":13},{"market":"ESP","total_recipients":63806,"total_revenue":4556.41,"weighted_open_rate":0.3866,"weighted_click_rate":0.0139,"first4_open":0.4672,"last4_open":0.3772,"delta_pts":-9.0,"weeks_active":11},{"market":"CZ","total_recipients":406865,"total_revenue":64012.15,"weighted_open_rate":0.2719,"weighted_click_rate":0.0172,"first4_open":0.326,"last4_open":0.2533,"delta_pts":-7.3,"weeks_active":13},{"market":"IT","total_recipients":121542,"total_revenue":11411.8,"weighted_open_rate":0.3609,"weighted_click_rate":0.0144,"first4_open":0.4048,"last4_open":0.3573,"delta_pts":-4.7,"weeks_active":12},{"market":"SK","total_recipients":57173,"total_revenue":9029.2,"weighted_open_rate":0.3579,"weighted_click_rate":0.0165,"first4_open":0.356,"last4_open":0.3481,"delta_pts":-0.8,"weeks_active":12},{"market":"HR","total_recipients":4185,"total_revenue":786.53,"weighted_open_rate":0.3726,"weighted_click_rate":0.0127,"first4_open":0.384,"last4_open":0.384,"delta_pts":0.0,"weeks_active":2},{"market":"FRA","total_recipients":3176,"total_revenue":872.76,"weighted_open_rate":0.3989,"weighted_click_rate":0.0126,"first4_open":0.367,"last4_open":0.3741,"delta_pts":0.7,"weeks_active":13}];
+
+const MARKET_NAMES = {
+  DACH: 'DACH', HU: 'Hungary', CZ: 'Czechia', NL: 'Netherlands', IT: 'Italy',
+  ESP: 'Spain', SK: 'Slovakia', SLO: 'Slovenia', PL: 'Poland', FRA: 'France', HR: 'Croatia'
+};
+
+const purple = '#7c68e0';
+const teal = '#1a9e78';
+const amber = '#c48a1a';
+const coral = '#c45a30';
+const gridColor = 'rgba(255,255,255,0.06)';
+const tickColor = '#6b647e';
+
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif";
+Chart.defaults.color = '#8a8599';
+
+const weekLabels = WEEKLY.map(w => w.label);
+
+// CHART 1: Volume & open rate
+new Chart(document.getElementById('chartVolume'), {
+  data: {
+    labels: weekLabels,
+    datasets: [
+      {
+        type: 'bar',
+        label: 'Recipients',
+        data: WEEKLY.map(w => w.total.recipients),
+        backgroundColor: purple + '99',
+        borderRadius: 3,
+        yAxisID: 'y'
+      },
+      {
+        type: 'line',
+        label: 'Open rate %',
+        data: WEEKLY.map(w => +(w.total.open_rate * 100).toFixed(1)),
+        borderColor: coral,
+        backgroundColor: coral,
+        borderWidth: 2.5,
+        pointRadius: 3,
+        pointBackgroundColor: coral,
+        tension: 0.3,
+        yAxisID: 'y1'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: true, labels: { color: '#8a84a4', font: { size: 11 }, boxWidth: 12 } },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.dataset.label === 'Recipients'
+            ? ' Recipients: ' + ctx.parsed.y.toLocaleString()
+            : ' Open rate: ' + ctx.parsed.y + '%'
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { color: tickColor, font: { size: 10 }, maxRotation: 45, minRotation: 45 }, grid: { display: false }, border: { color: 'transparent' } },
+      y: { position: 'left', ticks: { color: tickColor, font: { size: 11 }, callback: v => (v/1000) + 'k' }, grid: { color: gridColor }, border: { color: 'transparent' }, title: { display: true, text: 'Recipients', color: '#5a5470', font: { size: 11 } } },
+      y1: { position: 'right', min: 0, max: 60, ticks: { color: tickColor, font: { size: 11 }, callback: v => v + '%' }, grid: { display: false }, border: { color: 'transparent' }, title: { display: true, text: 'Open rate', color: '#5a5470', font: { size: 11 } } }
+    }
+  }
+});
+
+// CHART 2: Revenue & click rate
+new Chart(document.getElementById('chartRevenue'), {
+  data: {
+    labels: weekLabels,
+    datasets: [
+      {
+        type: 'bar',
+        label: 'Revenue (€)',
+        data: WEEKLY.map(w => +w.total.conversion_value.toFixed(0)),
+        backgroundColor: teal + '99',
+        borderRadius: 3,
+        yAxisID: 'y'
+      },
+      {
+        type: 'line',
+        label: 'Click rate %',
+        data: WEEKLY.map(w => +(w.total.click_rate * 100).toFixed(2)),
+        borderColor: amber,
+        backgroundColor: amber,
+        borderWidth: 2.5,
+        pointRadius: 3,
+        pointBackgroundColor: amber,
+        tension: 0.3,
+        yAxisID: 'y1'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: true, labels: { color: '#8a84a4', font: { size: 11 }, boxWidth: 12 } },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.dataset.label === 'Revenue (€)'
+            ? ' Revenue: €' + ctx.parsed.y.toLocaleString()
+            : ' Click rate: ' + ctx.parsed.y + '%'
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { color: tickColor, font: { size: 10 }, maxRotation: 45, minRotation: 45 }, grid: { display: false }, border: { color: 'transparent' } },
+      y: { position: 'left', ticks: { color: tickColor, font: { size: 11 }, callback: v => '€' + (v/1000) + 'k' }, grid: { color: gridColor }, border: { color: 'transparent' }, title: { display: true, text: 'Revenue', color: '#5a5470', font: { size: 11 } } },
+      y1: { position: 'right', min: 0, max: 5, ticks: { color: tickColor, font: { size: 11 }, callback: v => v + '%' }, grid: { display: false }, border: { color: 'transparent' }, title: { display: true, text: 'Click rate', color: '#5a5470', font: { size: 11 } } }
+    }
+  }
+});
+
+// MARKET EXPLORER
+const marketOrder = ['DACH','HU','CZ','NL','IT','ESP','SK','SLO','PL','FRA','HR'];
+let marketChart = null;
+let activeMarket = 'DACH';
+
+function fmtEUR(v) { return '€' + Math.round(v).toLocaleString(); }
+function fmtPct(v) { return (v*100).toFixed(1) + '%'; }
+
+function renderMarketButtons() {
+  const container = document.getElementById('marketButtons');
+  container.innerHTML = '';
+  marketOrder.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'mkt-btn' + (m === activeMarket ? ' active' : '');
+    btn.textContent = MARKET_NAMES[m] || m;
+    btn.onclick = () => { activeMarket = m; renderMarketButtons(); renderMarketView(); };
+    container.appendChild(btn);
+  });
+}
+
+function renderMarketStats() {
+  const s = SUMMARY.find(x => x.market === activeMarket);
+  const container = document.getElementById('marketStats');
+  const deltaClass = s.delta_pts <= -10 ? 'down' : (s.delta_pts >= 5 ? 'up' : 'flat');
+  const deltaArrow = s.delta_pts < 0 ? '▼' : (s.delta_pts > 0 ? '▲' : '—');
+  container.innerHTML = `
+    <div class="mkt-stat"><div class="mkt-stat-label">Total recipients</div><div class="mkt-stat-val">${s.total_recipients.toLocaleString()}</div></div>
+    <div class="mkt-stat"><div class="mkt-stat-label">Total revenue</div><div class="mkt-stat-val">${fmtEUR(s.total_revenue)}</div></div>
+    <div class="mkt-stat"><div class="mkt-stat-label">Avg click rate</div><div class="mkt-stat-val">${fmtPct(s.weighted_click_rate)}</div></div>
+    <div class="mkt-stat"><div class="mkt-stat-label">Open rate trend</div><div class="mkt-stat-val" style="font-size:15px;">${fmtPct(s.first4_open)} → ${fmtPct(s.last4_open)} <span class="stat-delta ${deltaClass}" style="display:inline;">${deltaArrow} ${Math.abs(s.delta_pts)}pts</span></div></div>
+  `;
+}
+
+function renderMarketChart() {
+  const openData = WEEKLY.map(w => w.markets[activeMarket].delivered > 0 ? +(w.markets[activeMarket].open_rate * 100).toFixed(1) : null);
+  const clickData = WEEKLY.map(w => w.markets[activeMarket].delivered > 0 ? +(w.markets[activeMarket].click_rate * 100).toFixed(2) : null);
+  document.getElementById('marketChartTitle').textContent = (MARKET_NAMES[activeMarket] || activeMarket) + ' — weekly open rate & click rate';
+
+  if (marketChart) marketChart.destroy();
+  marketChart = new Chart(document.getElementById('chartMarket'), {
+    data: {
+      labels: weekLabels,
+      datasets: [
+        { type: 'line', label: 'Open rate %', data: openData, borderColor: purple, backgroundColor: purple, borderWidth: 2.5, pointRadius: 3, spanGaps: true, tension: 0.3, yAxisID: 'y' },
+        { type: 'line', label: 'Click rate %', data: clickData, borderColor: amber, backgroundColor: amber, borderWidth: 2, pointRadius: 3, spanGaps: true, tension: 0.3, yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: true, labels: { color: '#8a84a4', font: { size: 11 }, boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { color: tickColor, font: { size: 10 }, maxRotation: 45, minRotation: 45 }, grid: { display: false }, border: { color: 'transparent' } },
+        y: { position: 'left', min: 0, max: 70, ticks: { color: tickColor, font: { size: 11 }, callback: v => v + '%' }, grid: { color: gridColor }, border: { color: 'transparent' } },
+        y1: { position: 'right', min: 0, max: 8, ticks: { color: tickColor, font: { size: 11 }, callback: v => v + '%' }, grid: { display: false }, border: { color: 'transparent' } }
+      }
+    }
+  });
+}
+
+function renderMarketView() {
+  renderMarketStats();
+  renderMarketChart();
+}
+
+renderMarketButtons();
+renderMarketView();
+
+// MARKET SUMMARY TABLE
+const tbody = document.getElementById('marketTableBody');
+SUMMARY.forEach(s => {
+  const tr = document.createElement('tr');
+  const deltaClass = s.delta_pts <= -12 ? 'bad' : (s.delta_pts <= -3 ? 'mid' : 'ok');
+  const deltaArrow = s.delta_pts < 0 ? '▼' : (s.delta_pts > 0 ? '▲' : '—');
+  tr.innerHTML = `
+    <td class="mkt-name">${MARKET_NAMES[s.market] || s.market}</td>
+    <td class="num">${s.total_recipients.toLocaleString()}</td>
+    <td class="num">${fmtEUR(s.total_revenue)}</td>
+    <td class="num">${fmtPct(s.first4_open)}</td>
+    <td class="num">${fmtPct(s.last4_open)}</td>
+    <td class="num"><span class="delta-tag ${deltaClass}">${deltaArrow} ${Math.abs(s.delta_pts)}</span></td>
+  `;
+  tbody.appendChild(tr);
+});
+
+</script>
+</body>
+</html>
